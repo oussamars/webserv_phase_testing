@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Sign in — MyApp</title>
+  <link rel="stylesheet" href="assets/css/login.css">
+</head>
+<body>
+  <main class="page">
+    <div class="card">
+      <header class="card__header">
+        <h1 class="title">Welcome back</h1>
+        <p class="subtitle">Sign in to continue to your account</p>
+      </header>
+
+      <form id="loginForm" class="form" action="/login.html" method="POST" novalidate>
+        <div class="field">
+          <label for="username">Username</label>
+          <input id="username" name="username" type="text" autocomplete="username" required>
+          <div class="field__error" id="err-username" aria-live="polite"></div>
+        </div>
+
+        <div class="field">
+          <label for="password">Password</label>
+          <div class="input-with-btn">
+            <input id="password" name="password" type="password" autocomplete="current-password" required>
+            <button type="button" id="togglePassword" class="btn-icon" aria-label="Show password">👁️</button>
+          </div>
+          <div class="field__error" id="err-password" aria-live="polite"></div>
+        </div>
+
+        <div class="row">
+          <label class="checkbox">
+            <input id="remember" name="remember" type="checkbox">
+            <span>Remember me</span>
+          </label>
+          <a class="link" href="/register.html">Create account</a>
+        </div>
+
+        <div id="serverError" class="server-error" aria-live="polite"></div>
+
+        <div class="actions">
+          <button id="submitBtn" type="submit" class="btn primary">Sign in</button>
+        </div>
+      </form>
+
+      <footer class="card__footer">
+        <small>By signing in you agree to our <a href="/terms.html">Terms</a>.</small>
+      </footer>
+    </div>
+  </main>
+
+  <script src="assets/js/login.js" defer></script>
+</body>
+</html>
+

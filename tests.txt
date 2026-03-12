@@ -1,0 +1,150 @@
+# ==================================================
+# 1) Basic connectivity
+# ==================================================
+
+# Test 1: Root page on 9000
+# What it does: Sends a normal GET request to "/".
+# What it tests: Server is up and responding on port 9000.
+# Expected: Valid HTTP response (HTTP/1.1 ...), no curl protocol error.
+# Command:
+curl -i http://127.0.0.1:9000/ --max-time 5
+
+# Test 2: Second server block on 9002
+# What it does: Sends GET request to port 9002.
+# What it tests: Multi-server / multi-port config works.
+# Expected: Valid HTTP response from server on 9002.
+# Command:
+curl -i http://127.0.0.1:9002/ --max-time 5
+
+
+# ==================================================
+# 2) Parser / protocol correctness
+# ==================================================
+
+# Test 3: Valid request syntax
+# What it does: Sends well-formed HTTP/1.1 request with Host.
+# What it tests: Normal parser path accepts valid request format.
+# Expected: 200/404 (route-dependent), but NOT 400 parse error.
+# Command:
+printf 'GET / HTTP/1.1\r\nHost: x\r\n\r\n' | nc -w 3 127.0.0.1 9000 | head -n 1
+
+# Test 4: Malformed header line
+# What it does: Sends header line without ":" separator.
+# What it tests: Header syntax validation.
+# Expected: HTTP/1.1 400 Bad Request.
+# Command:
+printf 'GET / HTTP/1.1\r\nHost: x\r\nBadHeader\r\n\r\n' | nc -w 3 127.0.0.1 9000 | head -n 1
+
+# Test 5: Unsupported HTTP version
+# What it does: Sends request with HTTP/2.0 in request line.
+# What it tests: HTTP version validation logic.
+# Expected: HTTP/1.1 505 HTTP Version Not Supported.
+# Command:
+printf 'GET / HTTP/2.0\r\nHost: x\r\n\r\n' | nc -w 3 127.0.0.1 9000 | head -n 1
+
+# Test 6: HTTP/1.0 without Host
+# What it does: Sends HTTP/1.0 request with no Host header.
+# What it tests: Correct Host rule handling for HTTP/1.0.
+# Expected: Should not fail only because Host is missing (status route-dependent).
+# Command:
+printf 'GET / HTTP/1.0\r\n\r\n' | nc -w 3 127.0.0.1 9000 | head -n 1
+
+# Test 7: Empty header name
+# What it does: Sends invalid header ": value".
+# What it tests: Header-name validation (must not be empty).
+# Expected: HTTP/1.1 400 Bad Request.
+# Command:
+printf 'GET / HTTP/1.1\r\n: value\r\nHost: x\r\n\r\n' | nc -w 3 127.0.0.1 9000 | head -n 1
+
+# Test 8: Path traversal
+# What it does: Sends URI containing "/../".
+# What it tests: Path traversal protection in parser/validation layer.
+# Expected: HTTP/1.1 400 Bad Request.
+# Command:
+printf 'GET /../secret HTTP/1.1\r\nHost: x\r\n\r\n' | nc -w 3 127.0.0.1 9000 | head -n 1
+
+
+# ==================================================
+# 3) POST method correctness
+# ==================================================
+
+# Test 9: Create new file
+# What it does: POSTs body "hello" to /a/b/file.txt.
+# What it tests: POST create behavior + parent directory creation.
+# Expected: HTTP/1.1 201 Created.
+# Command:
+printf 'POST /a/b/file.txt HTTP/1.1\r\nHost: x\r\nContent-Length: 5\r\n\r\nhello' | nc -w 3 127.0.0.1 9000 | head -n 1
+
+# Test 10: Overwrite existing file
+# What it does: POSTs new body "world" to same path.
+# What it tests: POST overwrite behavior.
+# Expected: HTTP/1.1 200 OK.
+# Command:
+printf 'POST /a/b/file.txt HTTP/1.1\r\nHost: x\r\nContent-Length: 5\r\n\r\nworld' | nc -w 3 127.0.0.1 9000 | head -n 1
+
+# Test 11: Missing Content-Length
+# What it does: Sends POST body with no Content-Length header.
+# What it tests: Length-required enforcement for POST.
+# Expected: HTTP/1.1 411 Length Required.
+# Command:
+printf 'POST /x HTTP/1.1\r\nHost: x\r\n\r\nabc' | nc -w 3 127.0.0.1 9000 | head -n 1
+
+# Test 12: Invalid Content-Length
+# What it does: Sends non-numeric Content-Length.
+# What it tests: Numeric validation of Content-Length.
+# Expected: HTTP/1.1 400 Bad Request.
+# Command:
+printf 'POST /x HTTP/1.1\r\nHost: x\r\nContent-Length: abc\r\n\r\nabc' | nc -w 3 127.0.0.1 9000 | head -n 1
+
+# Test 13: Payload too large
+# What it does: Declares huge Content-Length.
+# What it tests: MAX_BODY_SIZE protection.
+# Expected: HTTP/1.1 413 Payload Too Large.
+# Command:
+printf 'POST /x HTTP/1.1\r\nHost: x\r\nContent-Length: 999999999\r\n\r\n' | nc -w 3 127.0.0.1 9000 | head -n 1
+
+# Test 14: POST to root "/"
+# What it does: POSTs to "/" with a 1-byte body.
+# What it tests: Auto-generated filename behavior.
+# Expected: HTTP/1.1 201 Created (or your project-defined success code).
+# Command:
+printf 'POST / HTTP/1.1\r\nHost: x\r\nContent-Length: 1\r\n\r\nx' | nc -w 3 127.0.0.1 9000 | head -n 1
+
+# Test 15: Target path is directory
+# What it does: Creates uploads/conflict directory, then POSTs to /conflict.
+# What it tests: Conflict handling when target is a directory.
+# Expected: HTTP/1.1 409 Conflict.
+# Command:
+mkdir -p ./uploads/conflict
+printf 'POST /conflict HTTP/1.1\r\nHost: x\r\nContent-Length: 1\r\n\r\nx' | nc -w 3 127.0.0.1 9000 | head -n 1
+
+
+# ==================================================
+# 4) Response framing (important)
+# ==================================================
+
+# Test 16: GET framing/content-length consistency
+# What it does: Sends verbose GET to "/".
+# What it tests: Response framing correctness (headers/body length consistency).
+# Expected: No "curl: (18)" or partial-transfer/protocol errors.
+# Command:
+curl -v http://127.0.0.1:9000/ --max-time 5
+
+# Test 17: 404 framing/content-length consistency
+# What it does: Requests path that should not exist.
+# What it tests: Error response framing and Content-Length correctness.
+# Expected: Valid 404 response without transfer mismatch warning.
+# Command:
+curl -v http://127.0.0.1:9000/this-path-does-not-exist --max-time 5
+
+
+# ==================================================
+# 5) Optional CGI
+# ==================================================
+
+# Test 18: CGI endpoint on 9001
+# What it does: Sends GET to configured CGI route.
+# What it tests: CGI execution + CGI-to-HTTP response integration.
+# Expected: Valid HTTP response from CGI endpoint.
+# Command:
+curl -i http://127.0.0.1:9001/cgi-bin/ --max-time 5

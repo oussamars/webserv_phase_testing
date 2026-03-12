@@ -1,0 +1,23 @@
+problem auto indexing if the path is a folder DONE
+check for headername or key value are empty -> error DONE
+methods pemessions DONE
+status code when post works fine is 201 not 200 in upload ->>> oussama DONE
+curl -v http://127.0.0.1:9000/../../etc/passwd   403 not 404 --> DONE
+curl -v http://127.0.0.1:9000/folder/                          DONE
+curl http://127.0.0.1:9002/ -> (directory listing)             DONE
+
+
+
+error header post man  (status line duplicate request line)
+max body size problem
+in the part of autoindex (if a folder is requested!), khasna n9lbo wach deja kayna chi location ldak path && autoindex = on, or redirect, mohim ila 3ndo chi location ghadi tkhliha a oussama tdoz, ila ma3ndhach ghadi tbedl path b index li kayn f ServerConfig class. ok :)
+Your server must have default error pages if none are provided
+
+to do list oussama:
+page with the summary of webserv
+custom error page for errors
+page login and register and index
+
+failed tests :
+
+  curl -i http://127.0.0.1:9001/cgi-bin/ --max-time 5  -> cgi problem
